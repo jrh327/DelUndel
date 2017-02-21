@@ -24,12 +24,14 @@
 package net.jonhopkins.delundel.fs.fat;
 
 class Util {
+	static final int BAD_CLUSTER_12 = 0x0FF7;
 	static final int BAD_CLUSTER_16 = 0xFFF7;
 	static final int BAD_CLUSTER_32 = 0x0FFFFFF7;
+	static final int END_OF_CHAIN_12 = 0x0FF8;
 	static final int END_OF_CHAIN_16 = 0xFFF8;
 	static final int END_OF_CHAIN_32 = 0x0FFFFFF8;
 	static final int FREE_DIR_ENTRY = 0x00;
-	static final int DELETED_DIR_ENTRY = 0xe5;
+	static final int DELETED_DIR_ENTRY = 0xE5;
 	static final int ACTUALLY_0xE5 = 0x05;
 	
 	/**
@@ -107,5 +109,34 @@ class Util {
 			ret += ((byteArray[offset + i] & 0x00ff) << (i * 8));
 		}
 		return ret;
+	}
+	
+	static int unsignedInt12(byte[] byteArray, int offset, boolean first) {
+		int ret = 0;
+		
+		int firstByte = (int)byteArray[offset + 0];
+		int secondByte = (int)byteArray[offset + 1];
+		int thirdByte = (int)byteArray[offset + 2];
+		
+		// UV WX YZ --> XUV YZW
+		
+		if (first) {
+			ret = firstByte; // UV
+			ret += ((secondByte & 0x0f) << 8); // X
+		} else {
+			ret = (thirdByte << 4); // YZ
+			ret += ((secondByte & 0xf0) >> 4); // W
+		}
+		
+		return ret;
+	}
+	
+	protected static void testUnsignedInt12() {
+		// 12 34 56 --> 412 563
+		byte[] bytes = new byte[] { 0x12, 0x34, 0x56 };
+		int first = unsignedInt12(bytes, 0, true);
+		int second = unsignedInt12(bytes, 0, false);
+		
+		assert(first == 0x412 && second == 0x563);
 	}
 }

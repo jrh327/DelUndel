@@ -109,17 +109,23 @@ class FAT12 extends FAT {
 	
 	@Override
 	protected boolean isEndOfClusterChain(int fatEntry) {
-		return fatEntry >= 0x0FF8;
+		return fatEntry >= Util.END_OF_CHAIN_12;
 	}
 	
 	@Override
 	protected boolean isBadCluster(int fatEntry) {
-		return fatEntry == 0x0FF7;
+		return fatEntry == Util.BAD_CLUSTER_12;
 	}
 	
 	@Override
 	protected int getFATEntry(int entryNumber) {
-		return 0;
+		int entryPos = (entryNumber & 0x1); // even or odd entry number
+		int byteOffset = (entryNumber - entryPos) / 2 * 3 + entryPos;
+		int fatSector = byteOffset / bpb_bytesPerSector + FAT.startOfFAT();
+		byteOffset = byteOffset % (bpb_bytesPerSector / 2);
+		
+		return Util.unsignedInt12(ioManager.readSector(fatSector, bpb_bytesPerSector),
+				byteOffset, (entryPos != 1));
 	}
 
 	@Override
