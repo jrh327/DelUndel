@@ -174,6 +174,7 @@ public class FATDirectoryEntry extends FSDirectoryEntry {
 		return (info.dir_attributes & Util.ATTR_READ_ONLY) != 0;
 	}
 	
+	@Override
 	public boolean isHidden() {
 		return (info.dir_attributes & Util.ATTR_HIDDEN) != 0;
 	}
@@ -200,6 +201,7 @@ public class FATDirectoryEntry extends FSDirectoryEntry {
 		return (info.dir_attributes & Util.ATTR_ARCHIVE) != 0;
 	}
 	
+	@Override
 	public boolean isDeleted() {
 		return entryName.charAt(0) == Util.DELETED_DIR_ENTRY;
 	}

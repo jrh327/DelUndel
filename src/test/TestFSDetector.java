@@ -33,6 +33,6 @@ public class TestFSDetector extends FSDetector {
 	@Override
 	public FSFileSystem[] detectFileSystems() {
 		//return new FSFileSystem[] { FAT.getFAT(new TestIOManager(new TestDataFAT16())) };
-		return new FSFileSystem[] { FAT.getFAT(new FATIOManager("/home/jon/Desktop/sd_card")) };
+		return new FSFileSystem[] { FAT.getFAT(new FATIOManager("res/samplefat.bin")) };
 	}
 }

@@ -43,6 +43,10 @@ public abstract class FSDirectoryEntry {
 	
 	public abstract boolean isDirectory();
 	
+	public abstract boolean isHidden();
+	
+	public abstract boolean isDeleted();
+	
 	public abstract String getDateTimeCreated();
 	
 	public abstract String getDateTimeModified();

@@ -200,7 +200,10 @@ public class FSConsole {
 			info(COMMAND_COPY, "<source file> <destination location>");
 			info("\tCopy the specified file to the specified location on the host filesystem");
 			
-			info(COMMAND_LIST_DIR, "Print information about the files in the current directory");
+			info(COMMAND_LIST_DIR, "List the files in the current directory");
+			info("\t-l : Print extra information about each file");
+			info("\t-a : Also show hidden files");
+			info("\t-d : Also show deleted files");
 			
 			info(COMMAND_HELP, "Print this help message");
 			
@@ -220,21 +223,48 @@ public class FSConsole {
 				break;
 			}
 			
+			boolean showLong = false;
+			boolean showHidden = false;
+			boolean showDeleted = false;
+			for (String param : paramList) {
+				if (param.startsWith("-")) {
+					for (char p : param.toCharArray()) {
+						if (p == 'l') {
+							showLong = true;
+						} else if (p == 'a') {
+							showHidden = true;
+						} else if (p == 'd') {
+							showDeleted = true;
+						}
+					}
+				}
+			}
+			
 			for (FSDirectoryEntry entry : pwd.listDirectory()) {
-				System.out.format("%c %s %s %s %s %d bytes\n",
-						(entry.isDirectory() ? 'd' : ' '),
-						entry.getName(),
-						entry.getDateTimeCreated(),
-						entry.getDateTimeModified(),
-						entry.getDateAccessed(),
-						entry.getFileSize()
-						);
+				if (entry.isHidden() && !showHidden) {
+					continue;
+				}
+				if (entry.isDeleted() && !showDeleted) {
+					continue;
+				}
+				if (showLong) {
+					System.out.format("%c %s %s %s %s %d bytes\n",
+							(entry.isDirectory() ? 'd' : ' '),
+							entry.getName(),
+							entry.getDateTimeCreated(),
+							entry.getDateTimeModified(),
+							entry.getDateAccessed(),
+							entry.getFileSize()
+							);
+				} else {
+					System.out.format("%s\n", entry.getName());
+				}
 			}
 			break;
 		case COMMAND_MOUNT_FS:
+			// redo detection every time filesystems are listed
+			filesystems = filesystemDetector.detectFileSystems();
 			if (paramList.size() == 1) {
-				// redo detection every time filesystems are listed
-				filesystems = filesystemDetector.detectFileSystems();
 				System.out.println("mount: Available filesystems:");
 				for (FSFileSystem filesystem : filesystems) {
 					System.out.format("  %s\n", filesystem.getFileSystemName());
