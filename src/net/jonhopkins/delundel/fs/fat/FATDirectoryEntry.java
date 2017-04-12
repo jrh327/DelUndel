@@ -24,7 +24,6 @@
 package net.jonhopkins.delundel.fs.fat;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import net.jonhopkins.delundel.fs.FSDirectory;
@@ -145,19 +144,46 @@ public class FATDirectoryEntry extends FSDirectoryEntry {
 	public String getDateTimeCreated() {
 		int timeCreated = info.dir_createdTime;
 		int dateCreated = info.dir_createdDate;
+		
+		int year = ((dateCreated & 0xfe00) >> 9) + 1980;
+		int month = (dateCreated & 0x1e0) >> 5;
+		int day = (dateCreated & 0x1f);
+		
+		int hour = (timeCreated & 0xf800) >> 11;
+		int min = (timeCreated & 0x7e0) >> 5;
+		int sec = (timeCreated & 0x1f) * 2; // 2 second resolution
 		int millis = info.dir_createdTimeMillis;
-		return "" + (timeCreated << 16) + dateCreated + millis;
+		
+		return String.format("%02d-%02d-%04d %02d:%02d:%02d.%03d",
+				month, day, year, hour, min, sec, millis);
 	}
 	
 	@Override
 	public String getDateTimeModified() {
 		int timeModified = info.dir_lastWriteTime;
 		int dateModified = info.dir_lastWriteDate;
-		return "" + (timeModified << 16) + dateModified;
+		
+		int year = ((dateModified & 0xfe00) >> 9) + 1980;
+		int month = (dateModified & 0x1e0) >> 5;
+		int day = (dateModified & 0x1f);
+		
+		int hour = (timeModified & 0xf800) >> 11;
+		int min = (timeModified & 0x7e0) >> 5;
+		int sec = (timeModified & 0x1f) * 2; // 2 second resolution
+		
+		return String.format("%02d-%02d-%04d %02d:%02d:%02d",
+				month, day, year, hour, min, sec);
 	}
 	
 	public String getDateAccessed() {
-		return "" + info.dir_lastAccessDate;
+		int dateAccessed = info.dir_lastAccessDate;
+		
+		int year = ((dateAccessed & 0xfe00) >> 9) + 1980;
+		int month = (dateAccessed & 0x1e0) >> 5;
+		int day = (dateAccessed & 0x1f);
+		
+		return String.format("%02d-%02d-%04d",
+				month, day, year);
 	}
 	
 	public long getFileSize() {
@@ -338,15 +364,37 @@ public class FATDirectoryEntry extends FSDirectoryEntry {
 		protected long dir_fileSize;
 		
 		public ShortNameDE(byte[] dirEntry) {
-			char[] fileName = new char[8];
+			int numChars = 0;
 			for (int i = 0; i < 8; i++) {
-				fileName[i] = (char)Util.unsignedInt(dirEntry, i, 1);
+				if (dirEntry[i] != 0) {
+					numChars++;
+				}
+			}
+			char[] fileName = new char[numChars];
+			int count = 0;
+			for (int i = 0; i < numChars; i++) {
+				char ch = (char)Util.unsignedInt(dirEntry, i, 1);
+				if (ch != 0) {
+					fileName[count] = ch;
+					count++;
+				}
 			}
 			dir_name = new String(fileName);
 			
-			char[] extension = new char[3];
+			numChars = 0;
 			for (int i = 0; i < 3; i++) {
-				extension[i] = (char)Util.unsignedInt(dirEntry, i + 8, 1);
+				if (dirEntry[i + 8] != 0) {
+					numChars++;
+				}
+			}
+			char[] extension = new char[numChars];
+			count = 0;
+			for (int i = 0; i < numChars; i++) {
+				char ch = (char)Util.unsignedInt(dirEntry, i + 8, 1);
+				if (ch != 0) {
+					extension[count] = ch;
+					count++;
+				}
 			}
 			dir_extension = new String(extension);
 			
@@ -456,68 +504,101 @@ public class FATDirectoryEntry extends FSDirectoryEntry {
 		public LongNameDE(byte[] dirEntry) {
 			ldir_ordinal = Util.unsignedInt(dirEntry, 0, 1);
 			
-			ldir_name1 = new char[5];
+			// long name is 0x0000 terminated, and any remaining character 
+			// spaces are filled with 0xffff. Find the 0 if there is one 
+			// and skip the remaining characters.
+			boolean foundEnd = false;
+			int numChars = 0;
 			for (int i = 0; i < 5; i++) {
-				ldir_name1[i] = (char)Util.unsignedInt(dirEntry, i * 2 + 1, 2);
+				char ch = (char)Util.unsignedInt(dirEntry, i * 2 + 1, 2);
+				if (ch == 0) {
+					foundEnd = true;
+					break;
+				}
+				numChars++;
+			}
+			ldir_name1 = new char[numChars];
+			int count = 0;
+			for (int i = 0; i < numChars; i++) {
+				char ch = (char)Util.unsignedInt(dirEntry, i * 2 + 1, 2);
+				if (ch != 0) {
+					ldir_name1[count] = ch;
+					count++;
+				}
 			}
 			
 			ldir_attributes = Util.unsignedInt(dirEntry, 11, 1);
 			ldir_type = Util.unsignedInt(dirEntry, 12, 1);
 			ldir_checksum = Util.unsignedInt(dirEntry, 13, 1);
 			
-			ldir_name2 = new char[6];
-			for (int i = 0; i < 6; i++) {
-				ldir_name2[i] = (char)Util.unsignedInt(dirEntry, i * 2 + 14, 2);
+			if (!foundEnd) {
+				numChars = 0;
+				for (int i = 0; i < 6; i++) {
+					int ch = Util.unsignedInt(dirEntry, i * 2 + 14, 2);
+					if (ch == 0) {
+						foundEnd = true;
+						break;
+					}
+					numChars++;
+				}
+				ldir_name2 = new char[numChars];
+				count = 0;
+				for (int i = 0; i < numChars; i++) {
+					char ch = (char)Util.unsignedInt(dirEntry, i * 2 + 14, 2);
+					if (ch != 0) {
+						ldir_name2[count] = ch;
+						count++;
+					}
+				}
+			} else {
+				ldir_name2 = new char[0];
 			}
 			
 			ldir_firstCluster_lowWord = Util.unsignedInt(dirEntry, 26, 2);
 			
-			ldir_name3 = new char[2];
-			for (int i = 0; i < 2; i++) {
-				ldir_name3[i] = (char)Util.unsignedInt(dirEntry, i * 2 + 28, 2);
+			if (!foundEnd) {
+				numChars = 0;
+				for (int i = 0; i < 2; i++) {
+					int ch = Util.unsignedInt(dirEntry, i * 2 + 28, 2);
+					if (ch == 0) {
+						foundEnd = true;
+						break;
+					}
+					numChars++;
+				}
+				ldir_name3 = new char[numChars];
+				count = 0;
+				for (int i = 0; i < numChars; i++) {
+					char ch = (char)Util.unsignedInt(dirEntry, i * 2 + 28, 2);
+					if (ch != 0) {
+						ldir_name3[count] = ch;
+						count++;
+					}
+				}
+			} else {
+				ldir_name3 = new char[0];
 			}
 		}
 		
 		public String getName() {
-			// long name is \0 terminated, and any remaining character 
-			// spaces are filled with 0xff. Find the \0 if there is one 
-			// and remove the remaining characters.
-			char[] name = new char[13];
-			boolean foundEnd = false;
-			int index = 0;
-			for (int i = 0; i < ldir_name1.length; i++, index++) {
-				if (ldir_name1[i] == 0) {
-					foundEnd = true;
-					break;
-				}
-				name[index] = ldir_name1[i];
+			int len = ldir_name1.length + ldir_name2.length + ldir_name3.length;
+			char[] name = new char[len];
+			int count = 0;
+			
+			for (int i = 0; i < ldir_name1.length; i++) {
+				name[count] = ldir_name1[i];
+				count++;
+			}
+			for (int i = 0; i < ldir_name2.length; i++) {
+				name[count] = ldir_name2[i];
+				count++;
+			}
+			for (int i = 0; i < ldir_name3.length; i++) {
+				name[count] = ldir_name3[i];
+				count++;
 			}
 			
-			if (!foundEnd) {
-				for (int i = 0; i < ldir_name2.length; i++, index++) {
-					if (ldir_name2[i] == 0) {
-						foundEnd = true;
-						break;
-					}
-					name[index] = ldir_name2[i];
-				}
-			}
-			
-			if (!foundEnd) {
-				for (int i = 0; i < ldir_name3.length; i++, index++) {
-					if (ldir_name3[i] == 0) {
-						foundEnd = true;
-						break;
-					}
-					name[index] = ldir_name3[i];
-				}
-			}
-			
-			if (foundEnd) {
-				return new String(Arrays.copyOf(name, index)).trim();
-			}
-			
-			return new String(name).trim();
+			return new String(name);
 		}
 	}
 }
